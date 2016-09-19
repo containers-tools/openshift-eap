@@ -8,6 +8,7 @@ of the MIT license. See the LICENSE file for details.
 
 import os
 import shutil
+from pwd import getpwuid
 
 from cct.module import Module
 
@@ -42,4 +43,6 @@ class Install(Module):
             with open("{}/standalone.conf".format(added), "r") as in_fh:
                 out_fh.write(in_fh.read())
 
-        shutil.move("{}/standalone-openshift.xml".format(added), "{}/standalone/configuration/".format(jboss_home))
+        dst = "{}/standalone/configuration/standalone-openshift.xml".format(jboss_home)
+        shutil.move("{}/standalone-openshift.xml".format(added), dst)
+        os.chown(dst, 185, 185)

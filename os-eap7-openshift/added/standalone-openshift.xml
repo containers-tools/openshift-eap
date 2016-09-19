@@ -53,7 +53,6 @@
                 <authorization>
                     <properties path="application-roles.properties" relative-to="jboss.server.config.dir"/>
                 </authorization>
-                <!-- ##SSL## -->
             </security-realm>
         </security-realms>
         <audit-log>
@@ -173,8 +172,6 @@
                 </managed-scheduled-executor-services>
             </concurrent>
             <default-bindings context-service="java:jboss/ee/concurrency/context/default"
-                              ##DEFAULT_DATASOURCE##
-                              ##DEFAULT_JMS##
                               managed-executor-service="java:jboss/ee/concurrency/executor/default"
                               managed-scheduled-executor-service="java:jboss/ee/concurrency/scheduler/default"
                               managed-thread-factory="java:jboss/ee/concurrency/factory/default"/>
