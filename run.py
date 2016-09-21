@@ -7,9 +7,7 @@ of the MIT license. See the LICENSE file for details.
 """
 
 import os
-import ssl
 import shutil
-import urllib2
 import xml.dom.minidom
 import jinja2
 
@@ -21,19 +19,59 @@ class Run(Module):
         """
         Aggregate method that calls all configure_ methods in sequence.
         """
-        self.logger.debug("openshift-eap.Run::configure running!")
-        self.setup_xml()
+        self.initialize_templates()
         self.inject_jinja_markers()
-        self.teardown_xml()
+        self.process_jinja_template()
 
-    def setup_xml(self):
+    def initialize_templates(self):
+        """
+        Open and initialize jinja template objects
+        """
+        self.templates = {}
+        jboss_home = os.getenv("JBOSS_HOME")
+        template_path = "{}/standalone/configuration/templates".format(jboss_home)
+        for t in os.listdir(template_path):
+            with open(os.path.join(template_path,t)) as fh:
+                self.templates[t] = jinja2.Template(fh.read())
+
+    def inject_jinja_markers(self):
+        """
+        Inject markers into the standalone-openshift.xml file, ready for other
+        scripts to do insertions via Jinja templating
+        """
+
         jboss_home = os.getenv("JBOSS_HOME")
         self.config_file = "{}/standalone/configuration/standalone-openshift.xml".format(jboss_home)
         self.config = xml.dom.minidom.parse(self.config_file)
 
-    def teardown_xml(self):
+        # xml breaker: ##DEFAULT_DATASOURCE## and ##DEFAULT_JMS## were in
+        # server/profile/subsystem xmlns urn:jboss:domain:ee:4.0/default-bindings
+        # removed so jinja can parse the XML; but this will break datasources
+
+        # A datasources marker, will be handle by jinja (us)
+        parent = self._get_tag_by_attr('subsystem', 'xmlns', 'urn:jboss:domain:ee:4.0')
+        parent.appendChild(self.config.createTextNode("{{ default_bindings }}"))
+
         with open(self.config_file, "w") as fh:
             self.config.writexml(fh)
+
+    def process_jinja_template(self):
+        """
+        Processes the Jinja template standalone-openshift.xml to generate the real
+        deal.
+        """
+        # XXX: this will end up in another routine. Substitutions here are just what
+        # is needed for the older shell scripts to work.
+        default_bindings = self.templates['default-bindings.jinja'].render(
+            default_datasource='##DEFAULT_DATASOURCE##',
+            default_jms='##DEFAULT_JMS##'
+        )
+        self.logger.debug("process_jinja_template: chunk = {}".format(default_bindings))
+
+        with open(self.config_file,"r+") as fh:
+            template = jinja2.Template(fh.read())
+            fh.seek(0)
+            fh.write(template.render(default_bindings=default_bindings))
 
     def _get_tag_by_attr(self, tag, attr, val):
         """Convenience method for getting a tag via an attribute value"""
@@ -42,17 +80,3 @@ class Run(Module):
                 return elem
         self.logger.error("couldn't find correct {} element".format(tag))
         return
-
-    def inject_jinja_markers(self):
-        """
-        Inject markers into the standalone-openshift.xml.in file, ready for
-        both legacy shell scripts to do substitutions, and for newer Python
-        to do substitutions via Jinja templating
-        """
-        # xml breaker: ##DEFAULT_DATASOURCE## and ##DEFAULT_JMS## were in
-        # server/profile/subsystem xmlns urn:jboss:domain:ee:4.0/default-bindings
-        # removed so jinja can parse the XML; but this will break datasources
-
-        # SSL marker
-        parent = self._get_tag_by_attr('security-realm', 'name', 'ApplicationRealm')
-        parent.appendChild(self.config.createComment(" ##SSL## "))
