@@ -1,4 +1,4 @@
-= Experimental EAP PoC
+# Experimental EAP PoC
 
 This repository is an experimental proof of concept of converting some (old)
 shell scripts used for Data Sources configuration into Python, for use within
